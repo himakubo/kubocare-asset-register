@@ -316,6 +316,7 @@ select.mi{cursor:pointer;appearance:auto}
     <div class="ni" onclick="goTo('components',this)"><span class="ndot" style="background:var(--gn)"></span>Components</div>
     <div class="ni" onclick="goTo('products',this)"><span class="ndot" style="background:var(--ac)"></span>Devices</div>
     <div class="ns">SETTINGS</div>
+    <div class="ni" onclick="goTo('correct',this)"><span class="ndot" style="background:var(--rd)"></span>Bulk Correct</div>
     <div class="ni" onclick="goTo('setup',this)"><span class="ndot" style="background:var(--mu)"></span>Sheets Setup</div>
   </nav>
   <div class="sfooter">
@@ -553,6 +554,76 @@ select.mi{cursor:pointer;appearance:auto}
   <div class="row-count" id="prod-count"></div>
 </div>
 
+<!-- ═══ BULK CORRECT ═══ -->
+<div class="panel" id="panel-correct">
+  <div class="panel-hdr">
+    <div class="ph">Bulk Correct</div>
+    <div class="ps">Find rows by invoice number → fix wrong category, vendor, or item name across all matching rows at once</div>
+  </div>
+  <div class="panel-body">
+    <!-- Search -->
+    <div style="background:var(--sf);border:1px solid var(--bd);border-radius:10px;padding:14px 16px;margin-bottom:12px">
+      <div style="font-size:10px;font-family:var(--mono);letter-spacing:1px;color:var(--mu);margin-bottom:8px">FIND ROWS TO CORRECT</div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <input id="fix-inv" class="filter-inp" placeholder="Invoice number e.g. JBT251224001" style="flex:1;min-width:200px" oninput="fixSearch()">
+        <select id="fix-cat-filter" class="filter-inp" onchange="fixSearch()">
+          <option value="">All categories</option>
+          <option>PC</option><option>RDR</option><option>SW</option><option>NET</option><option>PSU</option><option>CBL</option><option>MSC</option>
+        </select>
+        <button class="btn btn-ac btn-sm" onclick="fixSearch()">Search</button>
+        <button class="btn btn-sm" onclick="document.getElementById('fix-inv').value='';document.getElementById('fix-cat-filter').value='';fixSearch()">Clear</button>
+      </div>
+      <div style="font-size:11px;color:var(--mu);margin-top:6px;font-family:var(--mono)" id="fix-count"></div>
+    </div>
+
+    <!-- Bulk apply -->
+    <div id="fix-actions" style="display:none;background:rgba(79,142,247,.07);border:1px solid rgba(79,142,247,.2);border-radius:10px;padding:12px 16px;margin-bottom:12px">
+      <div style="font-size:10px;font-family:var(--mono);letter-spacing:1px;color:var(--ac);margin-bottom:10px">APPLY TO ALL MATCHING ROWS</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-bottom:10px">
+        <div>
+          <div class="mlbl" style="margin-bottom:3px">Change category to</div>
+          <select class="mi" id="fix-new-cat" style="margin:0">
+            <option value="">— keep existing —</option>
+          </select>
+        </div>
+        <div>
+          <div class="mlbl" style="margin-bottom:3px">Change vendor to</div>
+          <input class="mi" id="fix-new-vendor" placeholder="Leave blank to keep" style="margin:0">
+        </div>
+        <div>
+          <div class="mlbl" style="margin-bottom:3px">Change item name to</div>
+          <input class="mi" id="fix-new-item" placeholder="Leave blank to keep" style="margin:0">
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn btn-gn" onclick="applyBulkFix()">Apply to all matching rows in Sheets</button>
+        <span id="fix-progress" style="font-size:11px;color:var(--mu);font-family:var(--mono)"></span>
+      </div>
+    </div>
+
+    <!-- Results table -->
+    <div id="fix-results" style="display:none">
+      <div class="tw"><table class="dt">
+        <thead><tr>
+          <th style="width:32px"><input type="checkbox" id="fix-all-cb" onchange="fixSelAll(this.checked)"></th>
+          <th style="width:90px"><div class="th-inner">ASSET ID</div></th>
+          <th style="width:56px"><div class="th-inner">CAT</div></th>
+          <th style="width:180px"><div class="th-inner">ITEM NAME</div></th>
+          <th style="width:130px"><div class="th-inner">VENDOR</div></th>
+          <th style="width:120px"><div class="th-inner">INVOICE</div></th>
+          <th style="width:90px"><div class="th-inner">STATUS</div></th>
+        </tr></thead>
+        <tbody id="fix-tbody"></tbody>
+      </table></div>
+      <div class="row-count" id="fix-row-count"></div>
+    </div>
+
+    <div id="fix-empty" style="text-align:center;padding:40px;color:var(--mu);font-size:13px">
+      Search by invoice number above to find rows to correct
+    </div>
+  </div>
+</div>
+
 <!-- ═══ SETUP ═══ -->
 <div class="panel" id="panel-setup">
   <div class="panel-hdr"><div class="ph">Google Sheets Setup</div><div class="ps">One-time setup — dashboard reads and writes live to your Sheet</div></div>
@@ -787,6 +858,7 @@ function goTo(id,el){
   el.classList.add('active');
   document.getElementById('panel-'+id).classList.add('active');
   if(id==='review')renderReview();
+  if(id==='correct'){fixSearch();}
   if(id==='invoices'){renderInv();populateVendorFilters();}
   if(id==='components'){renderComps();populateCompVendors();}
   if(id==='products')renderProds();
@@ -1593,6 +1665,83 @@ async function saveDevice(){
 }
 
 // ── Sheets ─────────────────────────────────────────────────────────────────
+// ── Bulk Correct ──────────────────────────────────────────────────────────
+let _fixSel=new Set();
+
+function fixSearch(){
+  const inv=(document.getElementById('fix-inv')?.value||'').trim().toLowerCase();
+  const cat=document.getElementById('fix-cat-filter')?.value||'';
+  if(!inv&&!cat){
+    document.getElementById('fix-results').style.display='none';
+    document.getElementById('fix-actions').style.display='none';
+    document.getElementById('fix-empty').style.display='block';
+    document.getElementById('fix-count').textContent='';
+    return;
+  }
+  const matches=SH.comp.map((r,i)=>({r,i,shRow:SH.comp_start+i})).filter(({r})=>{
+    const invMatch=!inv||String(r[4]||'').toLowerCase().includes(inv)||String(r[0]||'').toLowerCase().includes(inv);
+    const catMatch=!cat||r[1]===cat;
+    return invMatch&&catMatch;
+  });
+  document.getElementById('fix-count').textContent=`Found ${matches.length} component row${matches.length!==1?'s':''} in Sheets`;
+  document.getElementById('fix-results').style.display=matches.length?'block':'none';
+  document.getElementById('fix-actions').style.display=matches.length?'block':'none';
+  document.getElementById('fix-empty').style.display=matches.length?'none':'block';
+  const catSel=document.getElementById('fix-new-cat');
+  catSel.innerHTML='<option value="">— keep existing —</option>'+CATS.map(c=>`<option value="${c.c}">${c.c} — ${c.l}</option>`).join('');
+  _fixSel=new Set(matches.map(m=>m.i));
+  document.getElementById('fix-row-count').textContent=`${matches.length} rows shown · all selected`;
+  document.getElementById('fix-tbody').innerHTML=matches.map(({r,i,shRow})=>`<tr class="selected">
+    <td class="cb-cell"><input type="checkbox" checked data-idx="${i}" onchange="fixSel(${i},this.checked)"></td>
+    <td style="font-family:var(--mono);font-size:11px;color:var(--ac)">${r[0]}</td>
+    <td>${catBadge(r[1])}</td>
+    <td style="font-size:11px">${r[2]||''}</td>
+    <td style="color:var(--mu);font-size:11px">${r[3]||''}</td>
+    <td style="font-family:var(--mono);font-size:11px">${r[4]||''}</td>
+    <td><span class="badge ${SCLS[r[8]]||'bg-gr'}">${r[8]||''}</span></td>
+  </tr>`).join('');
+}
+function fixSel(i,checked){if(checked)_fixSel.add(i);else _fixSel.delete(i);}
+function fixSelAll(checked){
+  _fixSel.clear();
+  document.querySelectorAll('#fix-tbody input[type=checkbox]').forEach(cb=>{
+    cb.checked=checked;
+    if(checked)_fixSel.add(parseInt(cb.dataset.idx));
+  });
+}
+async function applyBulkFix(){
+  const newCat=document.getElementById('fix-new-cat').value;
+  const newVendor=document.getElementById('fix-new-vendor').value.trim();
+  const newItem=document.getElementById('fix-new-item').value.trim();
+  if(!newCat&&!newVendor&&!newItem){toast('Enter at least one field to change','error');return;}
+  if(!_fixSel.size){toast('No rows selected','error');return;}
+  if(!confirm(`Apply changes to ${_fixSel.size} component rows in Google Sheets?\nThis cannot be undone.`))return;
+  const prog=document.getElementById('fix-progress');
+  let done=0;
+  for(const i of _fixSel){
+    const shRow=SH.comp_start+i;
+    showOv(`Updating ${done+1} of ${_fixSel.size}...`);
+    try{
+      if(newCat){
+        const oldId=String(SH.comp[i][0]||'');
+        const numPart=oldId.replace(/^[A-Z]+-/,'');
+        const newId=newCat+'-'+numPart;
+        await shCall({action:'update_cell',sheet:'Component Register',row:shRow,col:1,value:newId});
+        await shCall({action:'update_cell',sheet:'Component Register',row:shRow,col:2,value:newCat});
+        SH.comp[i][0]=newId; SH.comp[i][1]=newCat;
+      }
+      if(newVendor){await shCall({action:'update_cell',sheet:'Component Register',row:shRow,col:4,value:newVendor});SH.comp[i][3]=newVendor;}
+      if(newItem){await shCall({action:'update_cell',sheet:'Component Register',row:shRow,col:3,value:newItem});SH.comp[i][2]=newItem;}
+    }catch(e){console.error('fix row error',i,e);}
+    done++;
+    prog.textContent=`${done}/${_fixSel.size} updated`;
+  }
+  hideOv();
+  prog.textContent=`✓ ${done} rows corrected`;
+  fixSearch();renderComps();
+  toast(`${done} rows corrected in Sheets`,'success');
+}
+
 async function shCall(payload){const r=await fetch(SURL,{method:'POST',body:JSON.stringify(payload)});const d=await r.json();if(d.status==='error')throw new Error(d.message);return d;}
 async function testConn(){
   const url=document.getElementById('surl-inp').value.trim();
