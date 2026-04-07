@@ -197,6 +197,16 @@ select.mi{cursor:pointer;appearance:auto}
 .tbtn:hover{color:var(--tx)}
 
 .row-count{font-size:11px;color:var(--mu);font-family:var(--mono);padding:6px 20px;border-top:1px solid var(--bd);flex-shrink:0}
+.combo-wrap{position:relative;width:100%}
+.combo-inp{width:100%;background:var(--sf2);border:1px solid var(--bd);border-radius:5px;padding:5px 28px 5px 9px;color:var(--tx);font-family:var(--sans);font-size:12px}
+.combo-inp:focus{outline:none;border-color:var(--ac)}
+.combo-inp.ok{border-color:rgba(46,204,113,.4)}
+.combo-inp.low{border-color:rgba(245,166,35,.5)}
+.combo-arrow{position:absolute;right:7px;top:50%;transform:translateY(-50%);color:var(--mu);font-size:10px;pointer-events:none}
+.combo-drop{position:absolute;top:calc(100% + 2px);left:0;right:0;background:var(--sf);border:1px solid var(--bd2);border-radius:6px;z-index:100;max-height:160px;overflow-y:auto;display:none;box-shadow:0 4px 12px rgba(0,0,0,.3)}
+.combo-drop.open{display:block}
+.combo-opt{padding:6px 10px;font-size:12px;cursor:pointer;color:var(--tx)}
+.combo-opt:hover,.combo-opt.sel{background:rgba(79,142,247,.12);color:var(--ac)}
 .dup-modal-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:10px 0}
 .dup-col{background:var(--sf2);border:1px solid var(--bd);border-radius:7px;padding:10px 12px}
 .dup-col-hdr{font-size:9px;font-family:var(--mono);letter-spacing:1px;margin-bottom:8px;padding-bottom:5px;border-bottom:1px solid var(--bd)}
@@ -1281,13 +1291,88 @@ async function showAt(idx){
 }
 function confB(c){return c?`<span class="conf ${c==='high'?'ch':c==='medium'?'cm':'cl'}">${c==='high'?'HI':c==='medium'?'MED':'LOW'}</span>`:''}
 function frow(lbl,id,val,conf,type='text'){return `<div class="field-row"><div class="field-lbl">${lbl}${confB(conf)}</div><input type="${type}" class="field-inp${conf==='low'?' low':conf==='high'?' ok':''}" id="${id}" value="${val||''}"></div>`;}
+
+// Smart combobox — type to filter, click to select, or type new value
+function comboRow(lbl,id,val,conf,suggestions){
+  const cls=conf==='low'?'low':conf==='high'?'ok':'';
+  return `<div class="field-row"><div class="field-lbl">${lbl}${confB(conf)}</div>
+  <div class="combo-wrap">
+    <input class="combo-inp ${cls}" id="${id}" value="${val||''}" autocomplete="off"
+      oninput="comboFilter('${id}')" onfocus="comboOpen('${id}')" onblur="setTimeout(()=>comboClose('${id}'),180)" onkeydown="comboKey(event,'${id}')">
+    <span class="combo-arrow">▾</span>
+    <div class="combo-drop" id="${id}-drop">
+      ${suggestions.map((s,i)=>`<div class="combo-opt" id="${id}-opt-${i}" onmousedown="comboPick('${id}','${s.replace(/'/g,"\'")}')">
+        ${s}</div>`).join('')}
+    </div>
+  </div></div>`;
+}
+
+function getVendorSuggestions(){
+  const from_sheet=[...new Set(SH.inv.map(r=>String(r[3]||'')).filter(Boolean))];
+  const defaults=['Avinya','Joybien Technologies'];
+  return [...new Set([...from_sheet,...defaults])].sort();
+}
+function getItemSuggestions(){
+  const from_sheet=[...new Set(SH.inv.map(r=>String(r[4]||'')).filter(Boolean))];
+  const defaults=['GMKtec Mini PC','FDS Radar Module (BM502)','AI Based FDS Software License','LOUP AX3000 WiFi 6 Adapter','Power Supply Unit'];
+  return [...new Set([...from_sheet,...defaults])].sort();
+}
+function comboOpen(id){
+  comboFilter(id);
+  document.getElementById(id+'-drop').classList.add('open');
+}
+function comboClose(id){document.getElementById(id+'-drop').classList.remove('open');}
+function comboFilter(id){
+  const val=(document.getElementById(id).value||'').toLowerCase();
+  const opts=document.querySelectorAll(`#${id}-drop .combo-opt`);
+  let any=false;
+  opts.forEach(o=>{
+    const match=!val||o.textContent.toLowerCase().includes(val);
+    o.style.display=match?'':'none';
+    if(match)any=true;
+  });
+  if(any)document.getElementById(id+'-drop').classList.add('open');
+}
+function comboPick(id,val){
+  document.getElementById(id).value=val;
+  comboClose(id);
+}
+function comboKey(e,id){
+  const drop=document.getElementById(id+'-drop');
+  const visible=[...drop.querySelectorAll('.combo-opt')].filter(o=>o.style.display!=='none');
+  const cur=drop.querySelector('.combo-opt.sel');
+  if(e.key==='ArrowDown'){e.preventDefault();
+    const idx=visible.indexOf(cur);const next=visible[idx+1]||visible[0];
+    if(cur)cur.classList.remove('sel');if(next)next.classList.add('sel');
+  }else if(e.key==='ArrowUp'){e.preventDefault();
+    const idx=visible.indexOf(cur);const prev=visible[idx-1]||visible[visible.length-1];
+    if(cur)cur.classList.remove('sel');if(prev)prev.classList.add('sel');
+  }else if(e.key==='Enter'&&cur){e.preventDefault();comboPick(id,cur.textContent.trim());
+  }else if(e.key==='Escape'){comboClose(id);}
+}
 function catSel(id,val,conf){return `<div class="field-row"><div class="field-lbl">Category${confB(conf)}</div><select class="field-inp${conf==='low'?' low':''}" id="${id}">${CATS.map(c=>`<option value="${c.c}"${c.c===val?' selected':''}>${c.c} — ${c.l}</option>`).join('')}</select></div>`;}
 function currSel(id,val){return `<div class="field-row"><div class="field-lbl">Currency</div><select class="field-inp" id="${id}"><option${val==='INR'?' selected':''}>INR</option><option${val==='USD'?' selected':''}>USD</option></select></div>`;}
 function buildEditor(bill){
   let items=Array.isArray(bill.items)&&bill.items.length?bill.items:[{item_name:'',category:'PC',qty:1,unit_price:0,currency:'INR',confidence:{}}];
   const hc=(bill.vendor||bill.invoice_no)?'high':'low';
-  let h=`<div style="margin-bottom:10px"><div style="font-size:9px;font-family:var(--mono);letter-spacing:1px;color:var(--mu);margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid var(--bd)">INVOICE HEADER</div>${frow('Vendor','hv',bill.vendor||'',hc)}${frow('Invoice No.','hin',bill.invoice_no||'',hc)}${frow('Date','hd',bill.invoice_date||'',hc,'date')}</div>`;
-  items.forEach((item,ii)=>{const cf=item.confidence||{};h+=`<div class="iblock"><div class="ibh">ITEM ${items.length>1?ii+1:''}</div>${frow('Item name',`in${ii}`,item.item_name||'',cf.item_name)}${catSel(`ic${ii}`,item.category||'PC',cf.category)}${frow('Qty',`iq${ii}`,item.qty||1,cf.qty,'number')}${frow('Unit price',`ip${ii}`,item.unit_price||0,cf.unit_price,'number')}${currSel(`icc${ii}`,item.currency||'INR')}</div>`;});
+  const vendors=getVendorSuggestions();
+  const itemNames=getItemSuggestions();
+  let h=`<div style="margin-bottom:10px">
+    <div style="font-size:9px;font-family:var(--mono);letter-spacing:1px;color:var(--mu);margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid var(--bd)">INVOICE HEADER</div>
+    ${comboRow('Vendor','hv',bill.vendor||'',hc,vendors)}
+    ${frow('Invoice No.','hin',bill.invoice_no||'',hc)}
+    ${frow('Date','hd',bill.invoice_date||'',hc,'date')}
+  </div>`;
+  items.forEach((item,ii)=>{
+    const cf=item.confidence||{};
+    h+=`<div class="iblock"><div class="ibh">ITEM ${items.length>1?ii+1:''}</div>
+      ${comboRow('Item name','in'+ii,item.item_name||'',cf.item_name,itemNames)}
+      ${catSel('ic'+ii,item.category||'PC',cf.category)}
+      ${frow('Qty','iq'+ii,item.qty||1,cf.qty,'number')}
+      ${frow('Unit price','ip'+ii,item.unit_price||0,cf.unit_price,'number')}
+      ${currSel('icc'+ii,item.currency||'INR')}
+    </div>`;
+  });
   document.getElementById('fed').innerHTML=h;
 }
 function navR(d){const p=bills.filter(b=>b.status==='pending');const n=curR+d;if(n>=0&&n<p.length)showAt(n);}
