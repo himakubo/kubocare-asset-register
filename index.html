@@ -381,20 +381,13 @@ select.mi{cursor:pointer;appearance:auto}
   </div>
   <div class="review-pane" id="rmain" style="display:none">
     <div class="review-left">
-      <div class="vtb" id="vtb" style="display:none">
-        <button class="tbtn" onclick="prevPg()">‹</button>
-        <span id="pginfo">Page 1 of 1</span>
-        <button class="tbtn" onclick="nextPg()">›</button>
-        <button class="tbtn" onclick="zIn()">＋</button>
-        <button class="tbtn" onclick="zOut()">－</button>
-        <span id="zinfo">120%</span>
-      </div>
-      <div class="viewer-wrap" id="vcw">
+      <div class="vtb" id="vtb" style="display:none"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--gn)" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg><span style="color:var(--gn)">PDF loaded — select &amp; copy text directly from the preview</span></div>
+      <div class="viewer-wrap" id="vcw" style="padding:0;align-items:stretch">
         <div class="vph" id="vph">
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" style="opacity:.2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
           <div style="font-size:11px;font-family:var(--mono)" id="vfn"></div>
         </div>
-        <canvas id="pdfcvs" style="display:none"></canvas>
+        
       </div>
       <div style="padding:10px 12px;border-top:1px solid var(--bd)" id="aiq"></div>
     </div>
@@ -1229,13 +1222,23 @@ async function callClaude(b64,fname,isPDF,mimeType){
 // ── PDF viewer ─────────────────────────────────────────────────────────────
 function freeBlobs(){_blobs.forEach(u=>{try{URL.revokeObjectURL(u);}catch(e){}});_blobs=[];}
 function mkBlob(b64,mime){const bin=atob(b64),len=bin.length,bytes=new Uint8Array(len);for(let i=0;i<len;i++)bytes[i]=bin.charCodeAt(i);const u=URL.createObjectURL(new Blob([bytes],{type:mime}));_blobs.push(u);return u;}
-async function loadPDF(b64){try{const bin=atob(b64),len=bin.length,bytes=new Uint8Array(len);for(let i=0;i<len;i++)bytes[i]=bin.charCodeAt(i);pdfDoc=await pdfjsLib.getDocument({data:bytes,disableWorker:true,verbosity:0}).promise;pdfPg=1;pdfZ=1.2;document.getElementById('vtb').style.display='flex';document.getElementById('pdfcvs').style.display='block';document.getElementById('vph').style.display='none';await renderPg();}catch(e){showPDFIframe(b64);}}
-async function renderPg(){if(!pdfDoc)return;try{const pg=await pdfDoc.getPage(pdfPg);const vp=pg.getViewport({scale:pdfZ});const cvs=document.getElementById('pdfcvs');cvs.width=vp.width;cvs.height=vp.height;await pg.render({canvasContext:cvs.getContext('2d'),viewport:vp}).promise;document.getElementById('pginfo').textContent=`Page ${pdfPg} of ${pdfDoc.numPages}`;document.getElementById('zinfo').textContent=Math.round(pdfZ*100)+'%';}catch(e){}}
-function showPDFIframe(b64){if(!b64)return;const url=mkBlob(b64,'application/pdf');document.getElementById('vcw').innerHTML=`<iframe src="${url}#toolbar=1&view=FitH" style="width:100%;height:100%;border:none;background:#fff"></iframe>`;document.getElementById('vtb').style.display='none';}
-function prevPg(){if(pdfPg>1){pdfPg--;renderPg();}}
-function nextPg(){if(pdfDoc&&pdfPg<pdfDoc.numPages){pdfPg++;renderPg();}}
-function zIn(){pdfZ=Math.min(3,pdfZ+0.2);renderPg();}
-function zOut(){pdfZ=Math.max(0.5,pdfZ-0.2);renderPg();}
+// ── PDF viewer — always uses native iframe so text is selectable & copyable ──
+async function loadPDF(b64){
+  // Native browser iframe = full text selection, copy/paste, zoom, search
+  const url=mkBlob(b64,'application/pdf');
+  const vcw=document.getElementById('vcw');
+  vcw.innerHTML=`<iframe src="${url}#toolbar=1&view=FitH&zoom=page-width"
+    style="width:100%;height:100%;min-height:500px;border:none;background:#fff"
+    title="Invoice preview"></iframe>`;
+  document.getElementById('vtb').style.display='none';
+}
+// Keep stubs so nothing breaks
+async function renderPg(){}
+function showPDFIframe(b64){loadPDF(b64);}
+function prevPg(){}
+function nextPg(){}
+function zIn(){}
+function zOut(){}
 
 // ── Review ─────────────────────────────────────────────────────────────────
 function renderReview(){
@@ -1255,7 +1258,7 @@ async function showAt(idx){
   document.getElementById('amsg').textContent='';
   freeBlobs();pdfDoc=null;
   const vcw=document.getElementById('vcw');
-  vcw.innerHTML=`<div class="vph" id="vph" style="display:flex;flex-direction:column"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" style="opacity:.2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><div style="font-size:11px;font-family:var(--mono)">${bill.fileName}</div></div><canvas id="pdfcvs" style="display:none"></canvas>`;
+  vcw.innerHTML=`<div class="vph" id="vph" style="display:flex;flex-direction:column"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" style="opacity:.2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><div style="font-size:11px;font-family:var(--mono)">${bill.fileName}</div></div>`;
   document.getElementById('vtb').style.display='none';
   if(!bill.fileB64&&bill._ref){try{bill.fileB64=await toB64(bill._ref.file);}catch(e){}}
   if(bill.fileB64){
