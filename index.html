@@ -6,6 +6,7 @@
 <title>KuboCare · Asset Register</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@600;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf_viewer.min.css">
 <style>
 :root{--bg:#0D0F14;--sf:#13161D;--sf2:#1A1E28;--bd:rgba(255,255,255,.07);--bd2:rgba(255,255,255,.13);--ac:#4F8EF7;--gn:#2ECC71;--am:#F5A623;--rd:#E74C3C;--pu:#7B61FF;--tx:#F0F2F8;--mu:#6B7280;--mu2:#9CA3AF;--mono:'DM Mono',monospace;--sans:'DM Sans',sans-serif;--disp:'Syne',sans-serif}
 *{box-sizing:border-box;margin:0;padding:0}
@@ -191,10 +192,15 @@ select.mi{cursor:pointer;appearance:auto}
 .overlay-msg{font-size:12px;color:var(--mu2);font-family:var(--mono)}
 
 /* Vtb */
-.vtb{display:flex;align-items:center;gap:6px;padding:6px 10px;background:var(--sf2);border-bottom:1px solid var(--bd);flex-shrink:0}
+.vtb{display:flex;align-items:center;gap:6px;padding:6px 10px;background:var(--sf2);border-bottom:1px solid var(--bd);flex-shrink:0;flex-shrink:0}
 .vtb span{font-size:10px;color:var(--mu);font-family:var(--mono)}
 .tbtn{background:none;border:1px solid var(--bd2);color:var(--mu2);border-radius:3px;padding:2px 7px;font-size:11px;cursor:pointer}
 .tbtn:hover{color:var(--tx)}
+/* PDF text layer — makes text selectable on canvas */
+.pdf-wrap{position:relative;display:inline-block}
+.textLayer{position:absolute;top:0;left:0;right:0;bottom:0;overflow:hidden;line-height:1;pointer-events:auto}
+.textLayer span{color:transparent;position:absolute;white-space:pre;cursor:text;transform-origin:0% 0%;user-select:text;-webkit-user-select:text}
+.textLayer ::selection{background:rgba(79,142,247,.35)}
 
 .row-count{font-size:11px;color:var(--mu);font-family:var(--mono);padding:6px 20px;border-top:1px solid var(--bd);flex-shrink:0}
 .combo-wrap{position:relative;width:100%}
@@ -381,7 +387,15 @@ select.mi{cursor:pointer;appearance:auto}
   </div>
   <div class="review-pane" id="rmain" style="display:none">
     <div class="review-left">
-      <div class="vtb" id="vtb" style="display:none"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--gn)" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg><span style="color:var(--gn)">PDF loaded — select &amp; copy text directly from the preview</span></div>
+      <div class="vtb" id="vtb" style="display:none">
+          <button class="tbtn" onclick="prevPg()">‹ Prev</button>
+          <span id="pginfo">Page 1 of 1</span>
+          <button class="tbtn" onclick="nextPg()">Next ›</button>
+          <button class="tbtn" onclick="zIn()">＋</button>
+          <button class="tbtn" onclick="zOut()">－</button>
+          <span id="zinfo">130%</span>
+          <span style="margin-left:6px;color:var(--gn)">● Text selectable — click &amp; drag to copy</span>
+        </div>
       <div class="viewer-wrap" id="vcw" style="padding:0;align-items:stretch">
         <div class="vph" id="vph">
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" style="opacity:.2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
@@ -1222,23 +1236,68 @@ async function callClaude(b64,fname,isPDF,mimeType){
 // ── PDF viewer ─────────────────────────────────────────────────────────────
 function freeBlobs(){_blobs.forEach(u=>{try{URL.revokeObjectURL(u);}catch(e){}});_blobs=[];}
 function mkBlob(b64,mime){const bin=atob(b64),len=bin.length,bytes=new Uint8Array(len);for(let i=0;i<len;i++)bytes[i]=bin.charCodeAt(i);const u=URL.createObjectURL(new Blob([bytes],{type:mime}));_blobs.push(u);return u;}
-// ── PDF viewer — always uses native iframe so text is selectable & copyable ──
+// ── PDF viewer with selectable text layer ─────────────────────────────────
 async function loadPDF(b64){
-  // Native browser iframe = full text selection, copy/paste, zoom, search
+  try{
+    const bin=atob(b64),len=bin.length,bytes=new Uint8Array(len);
+    for(let i=0;i<len;i++)bytes[i]=bin.charCodeAt(i);
+    pdfDoc=await pdfjsLib.getDocument({data:bytes,disableWorker:true,verbosity:0}).promise;
+    pdfPg=1; pdfZ=1.3;
+    document.getElementById('vtb').style.display='flex';
+    document.getElementById('vph').style.display='none';
+    await renderPg();
+  }catch(e){ showPDFIframe(b64); }
+}
+
+async function renderPg(){
+  if(!pdfDoc)return;
+  try{
+    const pg=await pdfDoc.getPage(pdfPg);
+    const vp=pg.getViewport({scale:pdfZ});
+    const vcw=document.getElementById('vcw');
+
+    // Build wrapper with canvas + text layer
+    vcw.innerHTML=`<div class="pdf-wrap" id="pdf-wrap" style="width:${vp.width}px;height:${vp.height}px">
+      <canvas id="pdfcvs" width="${vp.width}" height="${vp.height}" style="display:block"></canvas>
+      <div class="textLayer" id="textLayer" style="width:${vp.width}px;height:${vp.height}px"></div>
+    </div>`;
+
+    // Render canvas
+    const cvs=document.getElementById('pdfcvs');
+    await pg.render({canvasContext:cvs.getContext('2d'),viewport:vp}).promise;
+
+    // Render text layer — this is what makes text selectable
+    const textContent=await pg.getTextContent();
+    const textLayer=document.getElementById('textLayer');
+    pdfjsLib.renderTextLayer({
+      textContentSource: textContent,
+      container: textLayer,
+      viewport: vp,
+      textDivs: []
+    });
+
+    document.getElementById('pginfo').textContent=`Page ${pdfPg} of ${pdfDoc.numPages}`;
+    document.getElementById('zinfo').textContent=Math.round(pdfZ*100)+'%';
+  }catch(e){ console.error('renderPg error',e); }
+}
+
+function showPDFIframe(b64){
+  if(!b64)return;
+  // Fallback: open in new tab where selection always works
   const url=mkBlob(b64,'application/pdf');
   const vcw=document.getElementById('vcw');
-  vcw.innerHTML=`<iframe src="${url}#toolbar=1&view=FitH&zoom=page-width"
-    style="width:100%;height:100%;min-height:500px;border:none;background:#fff"
-    title="Invoice preview"></iframe>`;
+  vcw.innerHTML=`<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:10px;color:var(--mu)">
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" style="opacity:.3"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+    <div style="font-size:12px">PDF preview unavailable</div>
+    <a href="${url}" target="_blank" style="color:var(--ac);font-size:12px;text-decoration:underline">Open PDF in new tab →</a>
+  </div>`;
   document.getElementById('vtb').style.display='none';
 }
-// Keep stubs so nothing breaks
-async function renderPg(){}
-function showPDFIframe(b64){loadPDF(b64);}
-function prevPg(){}
-function nextPg(){}
-function zIn(){}
-function zOut(){}
+
+function prevPg(){if(pdfPg>1){pdfPg--;renderPg();}}
+function nextPg(){if(pdfDoc&&pdfPg<pdfDoc.numPages){pdfPg++;renderPg();}}
+function zIn(){pdfZ=Math.min(3,pdfZ+0.2);renderPg();}
+function zOut(){pdfZ=Math.max(0.5,pdfZ-0.2);renderPg();}
 
 // ── Review ─────────────────────────────────────────────────────────────────
 function renderReview(){
