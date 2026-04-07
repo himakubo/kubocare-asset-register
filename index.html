@@ -1175,21 +1175,44 @@ async function toB64(f){return new Promise((res,rej)=>{const r=new FileReader();
 
 async function callClaude(b64,fname,isPDF,mimeType){
   const mt=isPDF?'application/pdf':(mimeType||'image/jpeg');
-  const docBlock=isPDF?{type:'document',source:{type:'base64',media_type:mt,data:b64}}:{type:'image',source:{type:'base64',media_type:mt,data:b64}};
-  const cats=CATS.map(c=>`${c.c}=${c.l}`).join(', ');
-  const prompt=`Extract KuboCare procurement invoice data. Categories: ${cats}
-Per line item: item_name, category (exact code), qty (integer), unit_price (number), total (number), currency (INR/USD), confidence object (high/medium/low per field).
-Header: vendor, invoice_no (exactly as written), invoice_date (YYYY-MM-DD).
-Return ONLY valid JSON:
-{"vendor":"","invoice_no":"","invoice_date":"","items":[{"item_name":"","category":"","qty":1,"unit_price":0,"total":0,"currency":"INR","confidence":{"item_name":"high","qty":"high","unit_price":"high","category":"high"}}],"questions":[],"is_handwritten":false}`;
-  const resp=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1500,messages:[{role:'user',content:[docBlock,{type:'text',text:prompt}]}]})});
-  const d=await resp.json();if(d.error)throw new Error(d.error.message);
-  let txt=d.content?.map(c=>c.text||'').join('')||'';
+  const docBlock=isPDF
+    ?{type:'document',source:{type:'base64',media_type:'application/pdf',data:b64}}
+    :{type:'image',source:{type:'base64',media_type:mt,data:b64}};
+  const catList=CATS.map(c=>c.c+' = '+c.l).join(', ');
+  const prompt='Extract ALL fields from this KuboCare procurement invoice.\n'
+    +'Categories (use exact code): '+catList+'\n'
+    +'Return ONLY a JSON object with these fields:\n'
+    +'vendor (string), invoice_no (string), invoice_date (YYYY-MM-DD string),\n'
+    +'items (array of: item_name, category, qty integer, unit_price number, total number, currency INR or USD,\n'
+    +'confidence object with high/medium/low for each field), questions array, is_handwritten boolean.\n'
+    +'No markdown, no explanation, just the JSON object.';
+  const resp=await fetch('https://api.anthropic.com/v1/messages',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:2000,
+      messages:[{role:'user',content:[docBlock,{type:'text',text:prompt}]}]})
+  });
+  const d=await resp.json();
+  if(d.error)throw new Error(d.error.message);
+  if(!d.content||!d.content.length)throw new Error('Empty response');
+  let txt=d.content.map(function(c){return c.text||'';}).join('').trim();
+  txt=txt.replace(/^```json/,'').replace(/^```/,'').replace(/```$/,'').trim();
   const s=txt.indexOf('{'),en=txt.lastIndexOf('}');
-  if(s>=0&&en>s)txt=txt.slice(s,en+1); else txt=txt.replace(/```json|```/g,'').trim();
-  const p=JSON.parse(txt);
-  if(!Array.isArray(p.items)||!p.items.length)p.items=[{item_name:'',category:'PC',qty:1,unit_price:0,total:0,currency:'INR',confidence:{}}];
+  if(s>=0&&en>s)txt=txt.slice(s,en+1);
+  let p;
+  try{p=JSON.parse(txt);}catch(e){throw new Error('Bad JSON from AI');}
+  if(!Array.isArray(p.items)||!p.items.length){
+    p.items=[{item_name:p.item_name||'',category:p.category||'PC',
+      qty:p.qty||1,unit_price:p.unit_price||0,total:p.total||0,
+      currency:p.currency||'INR',
+      confidence:{item_name:'high',qty:'high',unit_price:'high',category:'high'}}];
+  }
+  p.items=p.items.map(function(item){return Object.assign({},item,{
+    qty:parseInt(item.qty)||1,
+    unit_price:parseFloat(item.unit_price)||0,
+    total:parseFloat(item.total)||0,
+    confidence:item.confidence||{item_name:'high',qty:'high',unit_price:'high',category:'high'}
+  });});
+  if(!p.questions)p.questions=[];
   return p;
 }
 
