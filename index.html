@@ -276,26 +276,54 @@ select.mi{cursor:pointer;appearance:auto}
 </div>
 
 <!-- Assemble modal -->
-<div class="mov" id="mod-asm">
-<div class="modal">
-  <h3>Assemble device</h3>
-  <div class="mid-preview">
-    <div style="font-size:9px;font-family:var(--mono);letter-spacing:1px;color:var(--mu)">AUTO DEVICE ID</div>
-    <div class="mid-val" id="m-id-prev">KC- — pick components</div>
+<!-- SKU Code Manager modal -->
+<div class="mov" id="mod-sku">
+<div class="modal" style="width:560px">
+  <h3>SKU Code Manager</h3>
+  <p style="font-size:12px;color:var(--mu2);margin-bottom:14px">Define codes for each component slot. These build your device SKU automatically — e.g. J + G2 + E1 + T200 = <strong style="color:var(--ac);font-family:var(--mono)">JG2E1T200</strong></p>
+  <div id="sku-slots-wrap"></div>
+  <div class="mrow" style="margin-top:12px">
+    <button class="btn btn-gn" onclick="saveSKUCodes();closeMod('mod-sku')">Save codes</button>
+    <button class="btn" onclick="closeMod('mod-sku')">Cancel</button>
   </div>
-  <div class="mlbl">PC asset ID</div><select class="mi" id="m-pc" onchange="updID()"></select>
-  <div class="mlbl">Radar module asset ID</div><select class="mi" id="m-rdr" onchange="updID()"></select>
-  <div class="mlbl">WiFi adapter asset ID</div><select class="mi" id="m-wifi" onchange="updID()"></select>
-  <div class="mlbl">Power supply asset ID</div><select class="mi" id="m-psu" onchange="updID()"></select>
-  <div class="mlbl">Other components</div><input class="mi" id="m-other" placeholder="CBL-001, ...">
-  <div style="height:1px;background:var(--bd);margin:8px 0"></div>
-  <div class="mlbl">Hostname</div><input class="mi" id="m-host" placeholder="kc2505p007">
-  <div class="mlbl">Location / site</div><input class="mi" id="m-loc" placeholder="US — Care Home A">
+</div>
+</div>
+
+<!-- Assemble modal — SKU based -->
+<div class="mov" id="mod-asm">
+<div class="modal" style="width:520px;max-height:92vh">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+    <h3 style="margin:0">Assemble device</h3>
+    <button class="btn btn-sm btn-am" onclick="openMod('mod-sku');renderSKUManager()">⚙ Manage SKU codes</button>
+  </div>
+
+  <!-- SKU preview -->
+  <div class="mid-preview" style="margin-bottom:14px">
+    <div style="font-size:9px;font-family:var(--mono);letter-spacing:1px;color:var(--mu);margin-bottom:4px">DEVICE SKU — AUTO BUILT FROM YOUR SELECTIONS</div>
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap" id="sku-preview-parts"></div>
+    <div style="font-family:var(--mono);font-size:18px;font-weight:700;color:var(--ac);margin-top:8px;letter-spacing:1px" id="m-id-prev">— select components below —</div>
+  </div>
+
+  <!-- Dynamic slot selectors — built from SKU_SLOTS -->
+  <div id="asm-slot-selectors"></div>
+
+  <div style="height:1px;background:var(--bd);margin:10px 0"></div>
+  <div class="mlbl">Quantity to assemble</div>
+  <input class="mi" id="m-qty" type="number" value="1" min="1" max="500" placeholder="1">
+  <div class="mlbl">Hostname</div>
+  <input class="mi" id="m-host" placeholder="kc2505p007 (leave blank if multiple)">
+  <div class="mlbl">Location / site</div>
+  <input class="mi" id="m-loc" placeholder="US — Care Home A">
   <div class="mlbl">Status</div>
-  <select class="mi" id="m-status"><option value="Inventory">Inventory</option><option value="In field">In field</option><option value="Research">Research</option></select>
-  <div class="mlbl">Notes</div><input class="mi" id="m-notes">
+  <select class="mi" id="m-status">
+    <option value="Inventory">Inventory — assembled, not deployed</option>
+    <option value="In field">In field — live at care home</option>
+    <option value="Research">Research — lab use</option>
+  </select>
+  <div class="mlbl">Notes</div>
+  <input class="mi" id="m-notes">
   <div class="mrow">
-    <button class="btn btn-gn" onclick="saveDevice()">Create device</button>
+    <button class="btn btn-gn" onclick="saveDevice()">Create device(s)</button>
     <button class="btn" onclick="closeMod('mod-asm')">Cancel</button>
   </div>
 </div>
@@ -316,6 +344,7 @@ select.mi{cursor:pointer;appearance:auto}
     <div class="ni" onclick="goTo('components',this)"><span class="ndot" style="background:var(--gn)"></span>Components</div>
     <div class="ni" onclick="goTo('products',this)"><span class="ndot" style="background:var(--ac)"></span>Devices</div>
     <div class="ns">SETTINGS</div>
+    <div class="ni" onclick="goTo('sku',this)"><span class="ndot" style="background:var(--am)"></span>SKU Code Manager</div>
     <div class="ni" onclick="goTo('correct',this)"><span class="ndot" style="background:var(--rd)"></span>Bulk Correct</div>
     <div class="ni" onclick="goTo('setup',this)"><span class="ndot" style="background:var(--mu)"></span>Sheets Setup</div>
   </nav>
@@ -552,6 +581,46 @@ select.mi{cursor:pointer;appearance:auto}
     <tbody id="prod-tbody"></tbody>
   </table></div>
   <div class="row-count" id="prod-count"></div>
+</div>
+
+<!-- ═══ SKU CODE MANAGER ═══ -->
+<div class="panel" id="panel-sku">
+  <div class="panel-hdr">
+    <div class="ph">SKU Code Manager</div>
+    <div class="ps">Define variant codes for each component slot — these build your device SKU automatically e.g. J + G2 + E1 + T200 = <span style="font-family:var(--mono);color:var(--ac)">JG2E1T200</span></div>
+  </div>
+  <div class="panel-body">
+
+    <!-- How it works -->
+    <div style="background:rgba(79,142,247,.07);border:1px solid rgba(79,142,247,.2);border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:12px;color:var(--mu2);line-height:1.8">
+      <strong style="color:var(--tx)">How SKU codes work:</strong><br>
+      Each <strong style="color:var(--tx)">slot</strong> = one component type (Radar, PC, WiFi...).
+      Each slot has <strong style="color:var(--tx)">options</strong> = one code per variant (J for Joybien, M for Minewsemi...).<br>
+      When you assemble a device, you pick one option per slot → codes join together → your SKU.
+      <br><strong style="color:var(--ac);font-family:var(--mono)">J + G2 + E1 + T200 = JG2E1T200</strong>
+    </div>
+
+    <!-- Action buttons -->
+    <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
+      <button class="btn btn-gn" onclick="saveSKUFromPanel()">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+        Save all changes
+      </button>
+      <button class="btn btn-ac btn-sm" onclick="addSlot();renderSKUPanel()">+ Add new slot</button>
+      <button class="btn btn-sm" onclick="resetSKUDefaults()">Reset to defaults</button>
+    </div>
+
+    <!-- Live preview -->
+    <div style="background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:10px 14px;margin-bottom:14px">
+      <div style="font-size:9px;font-family:var(--mono);letter-spacing:1px;color:var(--mu);margin-bottom:6px">LIVE PREVIEW — example SKU using first option from each slot</div>
+      <div style="font-family:var(--mono);font-size:22px;font-weight:700;color:var(--ac);letter-spacing:2px" id="sku-live-preview">—</div>
+      <div style="font-size:11px;color:var(--mu2);margin-top:4px" id="sku-live-breakdown"></div>
+    </div>
+
+    <!-- Slots editor -->
+    <div id="sku-panel-slots"></div>
+
+  </div>
 </div>
 
 <!-- ═══ BULK CORRECT ═══ -->
@@ -858,6 +927,7 @@ function goTo(id,el){
   el.classList.add('active');
   document.getElementById('panel-'+id).classList.add('active');
   if(id==='review')renderReview();
+  if(id==='sku'){renderSKUPanel();}
   if(id==='correct'){fixSearch();}
   if(id==='invoices'){renderInv();populateVendorFilters();}
   if(id==='components'){renderComps();populateCompVendors();}
@@ -1627,41 +1697,348 @@ async function doApprove(forceBypassDup=false){
 function doSkip(){const p=bills.filter(b=>b.status==='pending');bills[bills.indexOf(p[curR])].status='skipped';const np=bills.filter(b=>b.status==='pending');if(!np.length){renderReview();return;}showAt(Math.min(curR,np.length-1));document.getElementById('rt').textContent=np.length;updateStats();}
 
 // ── Assemble device ────────────────────────────────────────────────────────
-function buildID(pc,r,w,s){const p=[];if(pc)p.push('P'+pc.replace(/\D/g,'').padStart(3,'0'));if(r)p.push('R'+r.replace(/\D/g,'').padStart(3,'0'));if(w)p.push('W'+w.replace(/\D/g,'').padStart(3,'0'));if(s)p.push('S'+s.replace(/\D/g,'').padStart(3,'0'));return'KC-'+p.join('-');}
-function updID(){const id=buildID(document.getElementById('m-pc').value,document.getElementById('m-rdr').value,document.getElementById('m-wifi').value,document.getElementById('m-psu').value);const el=document.getElementById('m-id-prev');el.textContent=id==='KC-'?'KC- — pick components':id;el.style.color=id==='KC-'?'var(--mu)':'var(--ac)';}
-function openAsm(){
-  const none='<option value="">— None —</option>';
-  const opt=cat=>none+SH.comp.filter(r=>r[1]===cat&&r[8]==='Inventory').map(r=>`<option value="${r[0]}">${r[0]}</option>`).join('');
-  document.getElementById('m-pc').innerHTML=opt('PC');document.getElementById('m-rdr').innerHTML=opt('RDR');
-  document.getElementById('m-wifi').innerHTML=opt('NET');document.getElementById('m-psu').innerHTML=opt('PSU');
-  ['m-host','m-loc','m-other','m-notes'].forEach(id=>document.getElementById(id).value='');
-  document.getElementById('m-status').value='Inventory';
-  updID();openMod('mod-asm');
+// ── SKU System ─────────────────────────────────────────────────────────────
+// SKU_SLOTS: each slot = {name, catCode, options:[{label,code,notPresent}]}
+// Stored in localStorage so user can define/edit at any time
+const DEFAULT_SKU_SLOTS=[
+  {name:'Radar',catCode:'RDR',options:[
+    {label:'Joybien',code:'J',notPresent:false},
+    {label:'Minewsemi',code:'M',notPresent:false}
+  ]},
+  {name:'PC / SBC',catCode:'PC',options:[
+    {label:'GMKtec G1',code:'G1',notPresent:false},
+    {label:'GMKtec G2',code:'G2',notPresent:false},
+    {label:'Raspberry Pi 4',code:'R4',notPresent:false}
+  ]},
+  {name:'WiFi Hotspot',catCode:'NET',options:[
+    {label:'eDup E1',code:'E1',notPresent:false},
+    {label:'Not present',code:'XX',notPresent:true}
+  ]},
+  {name:'WiFi Client',catCode:'NET',options:[
+    {label:'TP-Link T200',code:'T200',notPresent:false},
+    {label:'Not present',code:'XX',notPresent:true}
+  ]}
+];
+
+let SKU_SLOTS=JSON.parse(localStorage.getItem('kc_sku_slots')||JSON.stringify(DEFAULT_SKU_SLOTS));
+function saveSKUSlots(){localStorage.setItem('kc_sku_slots',JSON.stringify(SKU_SLOTS));}
+
+// Build the SKU string from current selections
+function buildSKU(){
+  return SKU_SLOTS.map((slot,i)=>{
+    const sel=document.getElementById(`sku-sel-${i}`);
+    return sel?sel.value:'';
+  }).filter(Boolean).join('');
 }
+
+// Update the preview as user picks options
+function updID(){
+  const parts=SKU_SLOTS.map((slot,i)=>{
+    const sel=document.getElementById(`sku-sel-${i}`);
+    if(!sel||!sel.value) return null;
+    const opt=slot.options.find(o=>o.code===sel.value);
+    return {slot:slot.name,code:sel.value,label:opt?opt.label:sel.value,notPresent:opt?opt.notPresent:false};
+  }).filter(Boolean);
+
+  const sku=parts.map(p=>p.code).join('');
+  const prev=document.getElementById('m-id-prev');
+  const partsEl=document.getElementById('sku-preview-parts');
+
+  if(!sku){
+    prev.textContent='— select components below —';
+    prev.style.color='var(--mu)';
+    if(partsEl)partsEl.innerHTML='';
+    return;
+  }
+  prev.textContent=sku;
+  prev.style.color='var(--ac)';
+
+  if(partsEl){
+    partsEl.innerHTML=parts.map(p=>`
+      <span style="background:var(--sf2);border:1px solid var(--bd);border-radius:4px;padding:2px 8px;font-size:11px;font-family:var(--mono)">
+        <span style="color:var(--mu);font-size:9px">${p.slot}: </span>
+        <span style="color:${p.notPresent?'var(--mu)':'var(--tx)'}">${p.code}</span>
+        <span style="color:var(--mu);font-size:10px"> ${p.label}</span>
+      </span>`).join('<span style="color:var(--mu);font-size:14px;font-family:var(--mono)">+</span>');
+  }
+}
+
+// Build the slot selector UI inside the modal
+function buildSlotSelectors(){
+  const wrap=document.getElementById('asm-slot-selectors');
+  if(!wrap)return;
+  // Get previously used SKUs from product register for quick-pick
+  const usedSKUs=[...new Set(SH.prod.map(r=>String(r[0]||'')).filter(Boolean))];
+  let quickPick='';
+  if(usedSKUs.length){
+    quickPick=`<div style="margin-bottom:10px">
+      <div class="mlbl" style="margin-bottom:4px">QUICK PICK — previously used SKUs</div>
+      <div style="display:flex;gap:5px;flex-wrap:wrap">
+        ${usedSKUs.map(sku=>`<button class="btn btn-sm" style="font-family:var(--mono);font-size:11px" onclick="applySKU('${sku}')">${sku}</button>`).join('')}
+      </div>
+    </div>`;
+  }
+
+  const slots=SKU_SLOTS.map((slot,i)=>{
+    const opts=slot.options.map(o=>`<option value="${o.code}">${o.code} — ${o.label}${o.notPresent?' (not present)':''}</option>`).join('');
+    // Get inventory components for this slot's category
+    const inv=SH.comp.filter(r=>r[1]===slot.catCode&&r[8]==='Inventory');
+    const compOpts=inv.length
+      ? inv.map(r=>`<option value="${r[0]}">${r[0]}</option>`).join('')
+      : '<option value="" disabled>No inventory</option>';
+    return `<div style="background:var(--sf2);border:1px solid var(--bd);border-radius:7px;padding:10px 12px;margin-bottom:7px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:7px">
+        <div style="font-size:10px;font-family:var(--mono);letter-spacing:.5px;color:var(--mu);font-weight:500">${slot.name.toUpperCase()}</div>
+        <span class="badge bg-gr" style="font-size:9px">${slot.catCode}</span>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px">
+        <div>
+          <div class="mlbl" style="margin-bottom:3px">Variant code</div>
+          <select class="mi" id="sku-sel-${i}" style="margin:0;font-family:var(--mono)" onchange="updID()">
+            <option value="">— select —</option>
+            ${opts}
+          </select>
+        </div>
+        <div>
+          <div class="mlbl" style="margin-bottom:3px">Component asset ID</div>
+          <select class="mi" id="comp-sel-${i}" style="margin:0;font-family:var(--mono);font-size:11px">
+            <option value="">— none —</option>
+            ${compOpts}
+          </select>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  wrap.innerHTML=quickPick+slots;
+  updID();
+}
+
+// Apply a previously used SKU to the dropdowns
+function applySKU(sku){
+  // Try to match each slot's options against the SKU string
+  let remaining=sku;
+  SKU_SLOTS.forEach((slot,i)=>{
+    const sel=document.getElementById(`sku-sel-${i}`);
+    if(!sel)return;
+    // Find longest matching option code at current position
+    const match=slot.options.sort((a,b)=>b.code.length-a.code.length)
+      .find(o=>remaining.startsWith(o.code));
+    if(match){sel.value=match.code;remaining=remaining.slice(match.code.length);}
+  });
+  updID();
+}
+
+// Open assemble modal
+function openAsm(){
+  ['m-host','m-loc','m-notes'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  const qty=document.getElementById('m-qty');if(qty)qty.value='1';
+  const sta=document.getElementById('m-status');if(sta)sta.value='Inventory';
+  buildSlotSelectors();
+  openMod('mod-asm');
+}
+
+// Save device(s)
 async function saveDevice(){
-  const pc=document.getElementById('m-pc').value,radar=document.getElementById('m-rdr').value;
-  const wifi=document.getElementById('m-wifi').value,psu=document.getElementById('m-psu').value;
-  if(!pc&&!radar){toast('Select at least PC or Radar','error');return;}
-  const id=buildID(pc,radar,wifi,psu);
-  if(SH.prod.find(r=>r[0]===id)){toast('Device with these components already exists','error');return;}
+  const sku=buildSKU();
+  if(!sku){toast('Select at least one variant code','error');return;}
+  const qty=parseInt(document.getElementById('m-qty')?.value)||1;
   const hostname=document.getElementById('m-host').value.trim();
   const location=document.getElementById('m-loc').value.trim();
   const status=document.getElementById('m-status').value;
-  const other=document.getElementById('m-other').value.trim();
   const notes=document.getElementById('m-notes').value.trim();
   const assembled=new Date().toISOString().split('T')[0];
-  const device={id,hostname,status,location,assembled,deployed:status==='In field'?assembled:'',pc,radar,wifi,psu,other,notes};
+  const deployed=status==='In field'?assembled:'';
+
+  // Gather selected component IDs per slot
+  const slotComps=SKU_SLOTS.map((_,i)=>document.getElementById(`comp-sel-${i}`)?.value||'').filter(Boolean);
+
+  showOv(`Creating ${qty} device${qty>1?'s':''}...`);
+  let created=0;
   try{
-    await shCall({action:'add_product',product:device});
-    const cs=status==='Dismantled'?'Inventory':status;
-    for(const cid of [pc,radar,wifi,psu].filter(Boolean)){
-      const ci=SH.comp.findIndex(r=>r[0]===cid);
-      if(ci>=0){await shCall({action:'update_cell',sheet:'Component Register',row:SH.comp_start+ci,col:9,value:cs});await shCall({action:'update_cell',sheet:'Component Register',row:SH.comp_start+ci,col:10,value:id});}
+    for(let q=0;q<qty;q++){
+      const id=qty===1?sku:`${sku}-${String(q+1).padStart(3,'0')}`;
+      if(SH.prod.find(r=>r[0]===id)){toast(`${id} already exists — skipped`,'warn');continue;}
+      const host=qty===1?hostname:(hostname?`${hostname}-${String(q+1).padStart(2,'0')}`:'');
+      const device={id,hostname:host,status,location,assembled,deployed,
+        pc:slotComps[1]||'',radar:slotComps[0]||'',wifi:slotComps[2]||'',
+        psu:slotComps[3]||'',other:'',notes};
+      await shCall({action:'add_product',product:device});
+      // Update component statuses
+      for(const cid of slotComps){
+        const ci=SH.comp.findIndex(r=>r[0]===cid);
+        if(ci>=0){
+          await shCall({action:'update_cell',sheet:'Component Register',row:SH.comp_start+ci,col:9,value:status==='Inventory'?'Inventory':'In field'});
+          await shCall({action:'update_cell',sheet:'Component Register',row:SH.comp_start+ci,col:10,value:id});
+        }
+      }
+      created++;
     }
     await loadAll();
-    toast('Device created in Sheets','success');
+    toast(`${created} device${created>1?'s':''} created`,'success');
   }catch(e){toast('Failed: '+e.message,'error');}
+  hideOv();
   closeMod('mod-asm');
+}
+
+// ── SKU Code Manager UI ────────────────────────────────────────────────────
+function renderSKUPanel(){
+  renderSKUManager(); // reuse same rendering logic but target sku-panel-slots
+  const wrap=document.getElementById('sku-panel-slots');
+  if(!wrap)return;
+  // Copy from sku-slots-wrap if it exists
+  const mgr=document.getElementById('sku-slots-wrap');
+  if(mgr)wrap.innerHTML=mgr.innerHTML;
+  else{
+    // Render directly into panel
+    wrap.innerHTML=buildSKUEditorHTML();
+  }
+  updateSKULivePreview();
+}
+
+function buildSKUEditorHTML(){
+  return SKU_SLOTS.map((slot,si)=>`
+    <div style="background:var(--sf);border:1px solid var(--bd);border-radius:10px;padding:14px;margin-bottom:10px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+        <div style="font-size:10px;font-family:var(--mono);color:var(--mu);letter-spacing:1px">SLOT ${si+1}</div>
+        <input class="mi" value="${slot.name}" id="sname-${si}" placeholder="Slot name e.g. Radar"
+          style="margin:0;flex:1;min-width:120px;font-weight:500" oninput="updateSKULivePreview()">
+        <select class="mi" id="scat-${si}" style="margin:0;width:90px">
+          ${CATS.map(c=>`<option value="${c.c}"${c.c===slot.catCode?' selected':''}>${c.c}</option>`).join('')}
+        </select>
+        <button class="btn btn-rd btn-sm" onclick="removeSlot(${si});renderSKUPanel()">Remove slot</button>
+      </div>
+      <div style="font-size:10px;font-family:var(--mono);color:var(--mu);margin-bottom:8px;letter-spacing:.5px">
+        OPTIONS — one code per hardware variant
+      </div>
+      <div style="background:var(--sf2);border:1px solid var(--bd);border-radius:7px;padding:8px;margin-bottom:8px">
+        <div style="display:grid;grid-template-columns:90px 1fr auto auto;gap:6px;margin-bottom:5px;padding:0 4px">
+          <div style="font-size:9px;font-family:var(--mono);color:var(--mu)">CODE</div>
+          <div style="font-size:9px;font-family:var(--mono);color:var(--mu)">LABEL</div>
+          <div style="font-size:9px;font-family:var(--mono);color:var(--mu)">NOT PRESENT?</div>
+          <div></div>
+        </div>
+        ${slot.options.map((o,oi)=>`
+          <div style="display:grid;grid-template-columns:90px 1fr auto auto;gap:6px;margin-bottom:5px;align-items:center">
+            <input class="mi" value="${o.code}" id="ocode-${si}-${oi}" placeholder="e.g. J"
+              style="margin:0;font-family:var(--mono);font-weight:500;color:var(--ac)" oninput="updateSKULivePreview()">
+            <input class="mi" value="${o.label}" id="olbl-${si}-${oi}" placeholder="e.g. Joybien"
+              style="margin:0" oninput="updateSKULivePreview()">
+            <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--mu2);white-space:nowrap;cursor:pointer">
+              <input type="checkbox" ${o.notPresent?'checked':''} id="onp-${si}-${oi}" style="cursor:pointer"> Not present
+            </label>
+            <button class="btn btn-rd btn-sm" style="padding:2px 6px" onclick="removeOpt(${si},${oi});renderSKUPanel()">✕</button>
+          </div>`).join('')}
+      </div>
+      <button class="btn btn-sm" style="font-size:11px" onclick="addOpt(${si});renderSKUPanel()">
+        + Add option to this slot
+      </button>
+    </div>`).join('');
+}
+
+function updateSKULivePreview(){
+  // Build preview SKU using first option of each slot (or current editor values)
+  const parts=SKU_SLOTS.map((slot,si)=>{
+    const code=document.getElementById(`ocode-${si}-0`)?.value||slot.options[0]?.code||'?';
+    const lbl=document.getElementById(`olbl-${si}-0`)?.value||slot.options[0]?.label||'';
+    const name=document.getElementById(`sname-${si}`)?.value||slot.name;
+    return {code,lbl,name};
+  });
+  const sku=parts.map(p=>p.code).join('');
+  const el=document.getElementById('sku-live-preview');
+  const el2=document.getElementById('sku-live-breakdown');
+  if(el)el.textContent=sku||'—';
+  if(el2)el2.innerHTML=parts.map(p=>`<span style="margin-right:12px"><span style="color:var(--mu)">${p.name}:</span> <span style="font-family:var(--mono);color:var(--ac)">${p.code}</span> <span style="color:var(--mu2)">(${p.lbl})</span></span>`).join('');
+}
+
+function saveSKUFromPanel(){
+  // Read all values from panel editor and save
+  SKU_SLOTS=SKU_SLOTS.map((slot,si)=>({
+    name:document.getElementById(`sname-${si}`)?.value||slot.name,
+    catCode:document.getElementById(`scat-${si}`)?.value||slot.catCode,
+    options:slot.options.map((o,oi)=>({
+      code:document.getElementById(`ocode-${si}-${oi}`)?.value||o.code,
+      label:document.getElementById(`olbl-${si}-${oi}`)?.value||o.label,
+      notPresent:document.getElementById(`onp-${si}-${oi}`)?.checked||false
+    }))
+  }));
+  saveSKUSlots();
+  toast('SKU codes saved — ready to use in Assemble device','success');
+  updateSKULivePreview();
+}
+
+function resetSKUDefaults(){
+  if(!confirm('Reset all SKU codes to defaults? Your custom codes will be lost.'))return;
+  SKU_SLOTS=JSON.parse(JSON.stringify(DEFAULT_SKU_SLOTS));
+  saveSKUSlots();
+  renderSKUPanel();
+  toast('Reset to defaults','warn');
+}
+
+function renderSKUManager(){
+  const wrap=document.getElementById('sku-slots-wrap');
+  if(!wrap)return;
+  wrap.innerHTML=buildSKUEditorHTML();
+  updateSKULivePreview();
+}
+
+function renderSKUManager(){
+  const wrap=document.getElementById('sku-slots-wrap');
+  wrap.innerHTML=SKU_SLOTS.map((slot,si)=>`
+    <div style="background:var(--sf2);border:1px solid var(--bd);border-radius:8px;padding:12px;margin-bottom:10px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+        <input class="mi" value="${slot.name}" id="sname-${si}" placeholder="Slot name" style="margin:0;flex:1;font-weight:500">
+        <select class="mi" id="scat-${si}" style="margin:0;width:90px">
+          ${CATS.map(c=>`<option value="${c.c}"${c.c===slot.catCode?' selected':''}>${c.c}</option>`).join('')}
+        </select>
+        <button class="btn btn-rd btn-sm" onclick="removeSlot(${si})">Remove slot</button>
+      </div>
+      <div style="font-size:10px;font-family:var(--mono);color:var(--mu);margin-bottom:6px;letter-spacing:.5px">OPTIONS</div>
+      <div id="sopts-${si}">
+        ${slot.options.map((o,oi)=>`
+          <div style="display:flex;gap:6px;margin-bottom:5px;align-items:center">
+            <input class="mi" value="${o.code}" id="ocode-${si}-${oi}" placeholder="Code e.g. J" style="margin:0;width:80px;font-family:var(--mono)">
+            <input class="mi" value="${o.label}" id="olbl-${si}-${oi}" placeholder="Label e.g. Joybien" style="margin:0;flex:1">
+            <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--mu2);white-space:nowrap">
+              <input type="checkbox" ${o.notPresent?'checked':''} id="onp-${si}-${oi}"> Not present
+            </label>
+            <button class="btn btn-rd btn-sm" style="padding:2px 6px" onclick="removeOpt(${si},${oi})">✕</button>
+          </div>`).join('')}
+      </div>
+      <button class="btn btn-sm" style="margin-top:5px;font-size:11px" onclick="addOpt(${si})">+ Add option</button>
+    </div>`).join('')+
+  `<button class="btn btn-ac btn-sm" onclick="addSlot()" style="margin-top:4px">+ Add slot</button>`;
+}
+
+function saveSKUCodes(){
+  SKU_SLOTS=SKU_SLOTS.map((slot,si)=>({
+    name:document.getElementById(`sname-${si}`)?.value||slot.name,
+    catCode:document.getElementById(`scat-${si}`)?.value||slot.catCode,
+    options:slot.options.map((o,oi)=>({
+      code:document.getElementById(`ocode-${si}-${oi}`)?.value||o.code,
+      label:document.getElementById(`olbl-${si}-${oi}`)?.value||o.label,
+      notPresent:document.getElementById(`onp-${si}-${oi}`)?.checked||false
+    }))
+  }));
+  saveSKUSlots();
+  toast('SKU codes saved','success');
+}
+
+function addSlot(){
+  SKU_SLOTS.push({name:'New slot',catCode:'PC',options:[{label:'Option A',code:'A',notPresent:false}]});
+  renderSKUManager();
+}
+function removeSlot(si){
+  if(SKU_SLOTS.length<=1){toast('Need at least one slot','error');return;}
+  SKU_SLOTS.splice(si,1);renderSKUManager();
+}
+function addOpt(si){
+  SKU_SLOTS[si].options.push({label:'New option',code:'X',notPresent:false});
+  renderSKUManager();
+}
+function removeOpt(si,oi){
+  if(SKU_SLOTS[si].options.length<=1){toast('Need at least one option','error');return;}
+  SKU_SLOTS[si].options.splice(oi,1);renderSKUManager();
 }
 
 // ── Sheets ─────────────────────────────────────────────────────────────────
