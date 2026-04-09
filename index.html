@@ -978,10 +978,19 @@ function appendMisc(ss, entry) {
 }
 
 function clearAll(ss) {
-  [['Component Register',8],['Invoice Log',7],['Product Register',8]].forEach(([name,start]) => {
+  const sheets = ['Invoice Log','Component Register','Product Register','Miscellaneous Items'];
+  sheets.forEach(name => {
     const sh = ss.getSheetByName(name);
-    if (sh && sh.getLastRow() >= start)
-      sh.getRange(start,1,sh.getLastRow()-start+1,sh.getLastColumn()).clearContent();
+    if (!sh) return;
+    // Auto-detect first data row (first non-empty row after row 4)
+    let startRow = 6;
+    for (let r = 4; r <= Math.min(sh.getLastRow(), 20); r++) {
+      const val = sh.getRange(r, 1).getValue();
+      if (val !== '' && val !== null) { startRow = r; break; }
+    }
+    if (sh.getLastRow() >= startRow) {
+      sh.getRange(startRow, 1, sh.getLastRow() - startRow + 1, sh.getLastColumn()).clearContent();
+    }
   });
 }
 
@@ -2433,7 +2442,7 @@ async function testConn(){
 }
 function saveURL(){const u=document.getElementById('surl-inp').value.trim();if(u){SURL=u;localStorage.setItem('kc_url',u);}}
 function setSS(ok){document.getElementById('sdot').className='sdot'+(ok?' on':'');document.getElementById('slbl').textContent=ok?'Sheets connected':'Not connected';if(ok&&SURL)document.getElementById('sshort').textContent=SURL.replace('https://script.google.com/macros/s/','').substring(0,22)+'...';}
-async function clearAll(){if(!confirm('Wipe ALL data in Sheets and reset ID counters to 001?'))return;catSeq=Object.fromEntries(CATS.map(c=>[c.c,1]));localStorage.setItem('kc_seq',JSON.stringify(catSeq));files=[];bills=[];synced=0;renderQ();if(SURL){try{await shCall({action:'clear_all'});SH={inv:[],comp:[],prod:[],inv_start:7,comp_start:8,prod_start:8};renderInv();renderComps();renderProds();updateStats();toast('All data cleared','success');}catch(e){toast('Failed: '+e.message,'error');}}else toast('Local reset done','warn');}
+async function clearAll(){if(!confirm('Wipe ALL data in Sheets and reset ID counters to 001?'))return;catSeq=Object.fromEntries(CATS.map(c=>[c.c,1]));localStorage.setItem('kc_seq',JSON.stringify(catSeq));files=[];bills=[];synced=0;renderQ();if(SURL){try{await shCall({action:'clear_all'});SH={inv:[],comp:[],prod:[],misc:[],inv_start:7,comp_start:8,prod_start:8,misc_start:6};renderInv();renderComps();renderProds();renderMisc();updateStats();updateMiscStats();toast('All data cleared','success');}catch(e){toast('Failed: '+e.message,'error');}}else toast('Local reset done','warn');}
 function cpScript(){navigator.clipboard.writeText(document.getElementById('gscript').textContent);toast('Apps Script copied','success');}
 function openMod(id){document.getElementById(id).classList.add('open');}
 function closeMod(id){document.getElementById(id).classList.remove('open');}
