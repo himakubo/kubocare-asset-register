@@ -400,12 +400,13 @@ select.mi{cursor:pointer;appearance:auto}
 
 <!-- ═══ REVIEW ═══ -->
 <div class="panel" id="panel-review">
-  <div class="panel-hdr" style="display:flex;align-items:center;gap:10px;padding:10px 14px">
+  <div class="panel-hdr" style="display:flex;align-items:center;gap:10px;padding:10px 14px;flex-wrap:wrap">
     <div>
       <div class="ph" style="font-size:16px">Review &amp; Verify</div>
       <div class="ps">Bill <strong id="ri">1</strong> of <strong id="rt">1</strong> &nbsp;·&nbsp; <span id="rfn" style="font-family:var(--mono);font-size:10px;color:var(--mu)"></span></div>
     </div>
-    <div style="margin-left:auto;display:flex;gap:6px">
+    <div style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+      <button class="btn btn-sm btn-am" onclick="sortBillsByDate()" title="Sort oldest invoice first so asset IDs match purchase dates">↑ Sort by date</button>
       <button class="btn btn-sm" id="rprev" onclick="navR(-1)">← Prev</button>
       <button class="btn btn-sm" id="rnext" onclick="navR(1)">Next →</button>
     </div>
@@ -1446,7 +1447,30 @@ function renderReview(){
   const p=bills.filter(b=>b.status==='pending');
   document.getElementById('rempty').style.display=p.length?'none':'flex';
   document.getElementById('rmain').style.display=p.length?'grid':'none';
-  if(p.length){document.getElementById('rt').textContent=p.length;showAt(Math.min(curR,p.length-1));}
+  if(p.length){
+    document.getElementById('rt').textContent=p.length;
+    showAt(Math.min(curR,p.length-1));
+    // Show sort reminder if multiple bills pending
+    const amsg=document.getElementById('amsg');
+    if(p.length>1&&amsg&&!amsg.textContent){
+      amsg.innerHTML='<span style="color:var(--am)">Tip: approve oldest invoices first so asset IDs match purchase dates. <button class="btn btn-sm btn-am" style="padding:2px 8px;font-size:10px" onclick="sortBillsByDate()">Sort by date ↑</button></span>';
+    }
+  }
+}
+
+function sortBillsByDate(){
+  // Sort pending bills oldest-first by extracted invoice_date
+  const pending=bills.filter(b=>b.status==='pending');
+  const others=bills.filter(b=>b.status!=='pending');
+  pending.sort((a,b)=>{
+    const da=a.invoice_date||'9999';
+    const db=b.invoice_date||'9999';
+    return da.localeCompare(db);
+  });
+  bills=[...others,...pending];
+  curR=0;
+  renderReview();
+  toast('Bills sorted oldest → newest. Approve in this order for correct asset IDs.','success');
 }
 async function showAt(idx){
   const pending=bills.filter(b=>b.status==='pending');
@@ -1492,6 +1516,19 @@ async function showAt(idx){
   else if(!bill.error)qHTML=`<div style="font-size:10px;color:var(--mu);font-family:var(--mono)">All fields extracted confidently</div>`;
   document.getElementById('aiq').innerHTML=dupHTML+qHTML;
   buildEditor(bill);
+  // Show warning if this bill's date is older than latest in Sheet
+  const warn=document.getElementById('date-order-warn');
+  if(warn&&bill.invoice_date&&SH.inv.length){
+    const latestInSheet=SH.inv.reduce((max,r)=>{
+      const d=String(r[2]||'').split('T')[0];
+      return d>max?d:max;
+    },'');
+    const billDate=bill.invoice_date;
+    if(billDate<latestInSheet){
+      warn.style.display='inline';
+      warn.textContent=`⚠ This bill (${billDate}) is older than latest in Sheet (${latestInSheet}) — approve oldest invoices first`;
+    }else{warn.style.display='none';}
+  }
 }
 function confB(c){return c?`<span class="conf ${c==='high'?'ch':c==='medium'?'cm':'cl'}">${c==='high'?'HI':c==='medium'?'MED':'LOW'}</span>`:''}
 function frow(lbl,id,val,conf,type='text'){return `<div class="field-row"><div class="field-lbl">${lbl}${confB(conf)}</div><input type="${type}" class="field-inp${conf==='low'?' low':conf==='high'?' ok':''}" id="${id}" value="${val||''}"></div>`;}
