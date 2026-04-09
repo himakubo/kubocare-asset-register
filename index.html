@@ -1821,13 +1821,38 @@ async function doApprove(forceBypassDup=false){
       const qty=parseInt(document.getElementById(`iq${ii}`)?.value)||1;
       const price=parseFloat(document.getElementById(`ip${ii}`)?.value)||0;
       const curr=document.getElementById(`icc${ii}`)?.value||'INR';
-      const start=catSeq[cat]||1;
-      const idRange=qty===1?`${cat}-${String(start).padStart(3,'0')}`:`${cat}-${String(start).padStart(3,'0')} → ${cat}-${String(start+qty-1).padStart(3,'0')}`;
-      await shCall({action:'add_invoice',entry:{vendor,inv_no,inv_date,item_name:name,category:cat,qty,unit_price:price,total:Math.round(price*qty),currency:curr,id_range:idRange,source:bill.fileName,drive_url:driveUrl}});
-      const comps=[];
-      for(let i=0;i<qty;i++)comps.push({id:`${cat}-${String(start+i).padStart(3,'0')}`,category:cat,name,vendor,inv_no,date:inv_date,unit_price:price,currency:curr});
-      await shCall({action:'add_components',components:comps});
-      catSeq[cat]=(catSeq[cat]||1)+qty;
+
+      if(cat==='MSC'){
+        // MSC → goes to Miscellaneous Items sheet, no asset ID, no component rows
+        const miscEntry=[
+          '',           // Item ID — left blank, auto-numbered in sheet
+          name,         // Item Name
+          'Misc',       // Category
+          '',           // Sub-type
+          vendor,       // Vendor
+          inv_no,       // Invoice / Ref
+          inv_date,     // Date Received
+          qty,          // Qty
+          price,        // Unit Price
+          curr,         // Currency
+          'In stock',   // Status
+          '',           // Linked Device
+          '',           // Location
+          `From invoice ${inv_no} · ${bill.fileName}` // Notes
+        ];
+        await shCall({action:'add_invoice',entry:{vendor,inv_no,inv_date,item_name:name,category:cat,qty,unit_price:price,total:Math.round(price*qty),currency:curr,id_range:'Misc — see Misc Items sheet',source:bill.fileName,drive_url:driveUrl}});
+        await shCall({action:'add_misc',entry:miscEntry});
+        toast(`"${name}" saved to Miscellaneous Items sheet`,'success');
+      } else {
+        // All other categories → Component Register with asset IDs
+        const start=catSeq[cat]||1;
+        const idRange=qty===1?`${cat}-${String(start).padStart(3,'0')}`:`${cat}-${String(start).padStart(3,'0')} → ${cat}-${String(start+qty-1).padStart(3,'0')}`;
+        await shCall({action:'add_invoice',entry:{vendor,inv_no,inv_date,item_name:name,category:cat,qty,unit_price:price,total:Math.round(price*qty),currency:curr,id_range:idRange,source:bill.fileName,drive_url:driveUrl}});
+        const comps=[];
+        for(let i=0;i<qty;i++)comps.push({id:`${cat}-${String(start+i).padStart(3,'0')}`,category:cat,name,vendor,inv_no,date:inv_date,unit_price:price,currency:curr});
+        await shCall({action:'add_components',components:comps});
+        catSeq[cat]=(catSeq[cat]||1)+qty;
+      }
     }
     localStorage.setItem('kc_seq',JSON.stringify(catSeq));
     bills[bi].status='approved';
