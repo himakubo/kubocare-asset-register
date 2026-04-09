@@ -344,6 +344,7 @@ select.mi{cursor:pointer;appearance:auto}
     <div class="ni" onclick="goTo('components',this)"><span class="ndot" style="background:var(--gn)"></span>Components</div>
     <div class="ni" onclick="goTo('products',this)"><span class="ndot" style="background:var(--ac)"></span>Devices</div>
     <div class="ns">SETTINGS</div>
+    <div class="ni" onclick="goTo('misc',this)"><span class="ndot" style="background:var(--pu)"></span>Misc Items</div>
     <div class="ni" onclick="goTo('sku',this)"><span class="ndot" style="background:var(--am)"></span>SKU Code Manager</div>
     <div class="ni" onclick="goTo('correct',this)"><span class="ndot" style="background:var(--rd)"></span>Bulk Correct</div>
     <div class="ni" onclick="goTo('setup',this)"><span class="ndot" style="background:var(--mu)"></span>Sheets Setup</div>
@@ -584,6 +585,95 @@ select.mi{cursor:pointer;appearance:auto}
   <div class="row-count" id="prod-count"></div>
 </div>
 
+<!-- ═══ MISC ITEMS ═══ -->
+<div class="panel" id="panel-misc">
+  <div class="panel-hdr">
+    <div class="ph">Miscellaneous Items</div>
+    <div class="ps">SD cards, cables, tools, packaging, consumables — separate from core component register</div>
+  </div>
+  <div class="toolbar">
+    <div class="filter-group"><span class="filter-lbl">SEARCH</span>
+      <input class="filter-inp" id="misc-search" placeholder="Name, category, vendor..." oninput="renderMisc()" style="width:160px"></div>
+    <div class="filter-group"><span class="filter-lbl">CATEGORY</span>
+      <select class="filter-inp" id="misc-cat" onchange="renderMisc()">
+        <option value="">All</option>
+        <option>SD Card</option><option>Cable</option><option>Tool</option>
+        <option>Packaging</option><option>Adapter</option><option>Battery</option>
+        <option>Spare Part</option><option>Consumable</option><option>Other</option>
+      </select></div>
+    <div class="filter-group"><span class="filter-lbl">STATUS</span>
+      <select class="filter-inp" id="misc-status" onchange="renderMisc()">
+        <option value="">All</option>
+        <option>In stock</option><option>In use</option><option>Depleted</option><option>Damaged</option>
+      </select></div>
+    <div class="toolbar-right">
+      <button class="btn btn-ac btn-sm" onclick="openAddMisc()">+ Add item</button>
+      <button class="btn btn-sm" onclick="loadAll()">↻ Refresh</button>
+    </div>
+  </div>
+  <div class="stats-bar">
+    <div class="stat-item"><span class="stat-dot" style="background:var(--pu)"></span><span class="stat-val" id="misc-total">0</span><span class="stat-lbl">total items</span></div>
+    <div class="stat-item"><span class="stat-dot" style="background:var(--gn)"></span><span class="stat-val" id="misc-instock">0</span><span class="stat-lbl">in stock</span></div>
+    <div class="stat-item"><span class="stat-dot" style="background:var(--am)"></span><span class="stat-val" id="misc-inuse">0</span><span class="stat-lbl">in use</span></div>
+  </div>
+  <div class="dt-wrap"><table class="dt" id="misc-table">
+    <thead><tr>
+      <th style="width:90px"><div class="th-inner sortable" onclick="sortTable('misc',0)">ITEM ID <span class="sort-icon">⇅</span></div></th>
+      <th style="width:180px"><div class="th-inner">ITEM NAME</div></th>
+      <th style="width:110px"><div class="th-inner sortable" onclick="sortTable('misc',2)">CATEGORY <span class="sort-icon">⇅</span></div></th>
+      <th style="width:110px"><div class="th-inner">SUB-TYPE</div></th>
+      <th style="width:130px"><div class="th-inner sortable" onclick="sortTable('misc',4)">VENDOR <span class="sort-icon">⇅</span></div></th>
+      <th style="width:120px"><div class="th-inner">INVOICE / REF</div></th>
+      <th style="width:90px"><div class="th-inner sortable" onclick="sortTable('misc',6)">DATE <span class="sort-icon">⇅</span></div></th>
+      <th style="width:50px"><div class="th-inner" style="justify-content:center">QTY</div></th>
+      <th style="width:90px"><div class="th-inner" style="justify-content:center">PRICE</div></th>
+      <th style="width:50px"><div class="th-inner">CURR</div></th>
+      <th style="width:100px"><div class="th-inner">STATUS</div></th>
+      <th style="width:120px"><div class="th-inner">LINKED DEVICE</div></th>
+      <th style="width:120px"><div class="th-inner">NOTES</div></th>
+      <th style="width:36px"></th>
+    </tr></thead>
+    <tbody id="misc-tbody"></tbody>
+  </table></div>
+  <div class="row-count" id="misc-count"></div>
+</div>
+
+<!-- Add misc item modal -->
+<div class="mov" id="mod-misc">
+<div class="modal" style="width:500px">
+  <h3>Add miscellaneous item</h3>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+    <div><div class="mlbl">Item name *</div><input class="mi" id="misc-name" placeholder="e.g. SanDisk 32GB SD Card"></div>
+    <div><div class="mlbl">Category</div>
+      <select class="mi" id="misc-catsel">
+        <option>SD Card</option><option>Cable</option><option>Tool</option>
+        <option>Packaging</option><option>Adapter</option><option>Battery</option>
+        <option>Spare Part</option><option>Consumable</option><option>Other</option>
+      </select></div>
+    <div><div class="mlbl">Sub-type / model</div><input class="mi" id="misc-subtype" placeholder="e.g. Class 10, 32GB"></div>
+    <div><div class="mlbl">Vendor</div><input class="mi" id="misc-vendor" placeholder="e.g. Amazon"></div>
+    <div><div class="mlbl">Invoice / Reference</div><input class="mi" id="misc-inv" placeholder="Invoice number or order ID"></div>
+    <div><div class="mlbl">Date received</div><input class="mi" type="date" id="misc-date"></div>
+    <div><div class="mlbl">Quantity</div><input class="mi" type="number" id="misc-qty" value="1" min="1"></div>
+    <div><div class="mlbl">Unit price</div><input class="mi" type="number" id="misc-price" value="0" step="0.01"></div>
+    <div><div class="mlbl">Currency</div>
+      <select class="mi" id="misc-curr"><option>INR</option><option>USD</option></select></div>
+    <div><div class="mlbl">Status</div>
+      <select class="mi" id="misc-statussel">
+        <option>In stock</option><option>In use</option><option>Depleted</option><option>Damaged</option>
+      </select></div>
+    <div><div class="mlbl">Linked device (optional)</div><input class="mi" id="misc-device" placeholder="e.g. JG2E1T200"></div>
+    <div><div class="mlbl">Location</div><input class="mi" id="misc-loc" placeholder="e.g. KuboCare Lab"></div>
+  </div>
+  <div class="mlbl" style="margin-top:4px">Notes</div>
+  <input class="mi" id="misc-notes" placeholder="Optional notes">
+  <div class="mrow">
+    <button class="btn btn-gn" onclick="saveMiscItem()">Add to Sheet</button>
+    <button class="btn" onclick="closeMod('mod-misc')">Cancel</button>
+  </div>
+</div>
+</div>
+
 <!-- ═══ SKU CODE MANAGER ═══ -->
 <div class="panel" id="panel-sku">
   <div class="panel-hdr">
@@ -730,9 +820,10 @@ function doPost(e) {
 // ── Get all sheet data ────────────────────────────────────────────────────
 function getAllData(ss) {
   const sheets = {
-    'Invoice Log':        {key:'inv',  idCol:1},
-    'Component Register': {key:'comp', idCol:0},
-    'Product Register':   {key:'prod', idCol:0}
+    'Invoice Log':          {key:'inv',  idCol:1},
+    'Component Register':   {key:'comp', idCol:0},
+    'Product Register':     {key:'prod', idCol:0},
+    'Miscellaneous Items':  {key:'misc', idCol:0}
   };
   const out = {inv:[],comp:[],prod:[],inv_start:0,comp_start:0,prod_start:0};
   Object.entries(sheets).forEach(([name,cfg]) => {
@@ -867,6 +958,15 @@ function deleteSheetRow(ss, sheetName, row) {
   if (sh) sh.deleteRow(row);
 }
 
+function appendMisc(ss, entry) {
+  const sh = ss.getSheetByName('Miscellaneous Items');
+  if (!sh) return;
+  const nr = sh.getLastRow()+1;
+  sh.appendRow(entry);
+  sh.getRange(nr,1,1,entry.length).setBackground(nr%2===0?'#EBF4FF':'#F8FAFB');
+  sh.setRowHeight(nr,18);
+}
+
 function clearAll(ss) {
   [['Component Register',8],['Invoice Log',7],['Product Register',8]].forEach(([name,start]) => {
     const sh = ss.getSheetByName(name);
@@ -903,9 +1003,9 @@ try{const w=`importScripts('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.1
 // ── State ──────────────────────────────────────────────────────────────────
 let SURL=localStorage.getItem('kc_url')||'';
 let catSeq=JSON.parse(localStorage.getItem('kc_seq')||'{"PC":1,"RDR":1,"SW":1,"NET":1,"PSU":1,"CBL":1,"MSC":1}');
-let SH={inv:[],comp:[],prod:[],inv_start:7,comp_start:8,prod_start:8};
+let SH={inv:[],comp:[],prod:[],misc:[],inv_start:7,comp_start:8,prod_start:8,misc_start:6};
 let files=[],bills=[],curR=0,synced=0,_stop=false,_blobs=[];
-let sortState={inv:{col:-1,dir:1},comp:{col:-1,dir:1},prod:{col:-1,dir:1}};
+let sortState={inv:{col:-1,dir:1},comp:{col:-1,dir:1},prod:{col:-1,dir:1},misc:{col:-1,dir:1}};
 let selRows={inv:new Set(),comp:new Set(),prod:new Set()};
 let pdfDoc=null,pdfPg=1,pdfZ=1.2;
 const DEFAULT_CATS=[{c:'PC',l:'GMKtec Mini PC'},{c:'RDR',l:'FDS Radar Module'},{c:'SW',l:'Software License'},{c:'NET',l:'WiFi Adapter'},{c:'PSU',l:'Power Supply'},{c:'CBL',l:'Cable'},{c:'MSC',l:'Misc'}];
@@ -928,6 +1028,7 @@ function goTo(id,el){
   el.classList.add('active');
   document.getElementById('panel-'+id).classList.add('active');
   if(id==='review')renderReview();
+  if(id==='misc'){renderMisc();updateMiscStats();}
   if(id==='sku'){renderSKUPanel();}
   if(id==='correct'){fixSearch();}
   if(id==='invoices'){renderInv();populateVendorFilters();}
@@ -941,8 +1042,8 @@ async function loadAll(){
   showOv('Loading from Sheets...');
   try{
     const d=await shCall({action:'get_all'});
-    SH.inv=d.inv||[]; SH.comp=d.comp||[]; SH.prod=d.prod||[];
-    SH.inv_start=d.inv_start||7; SH.comp_start=d.comp_start||8; SH.prod_start=d.prod_start||8;
+    SH.inv=d.inv||[]; SH.comp=d.comp||[]; SH.prod=d.prod||[]; SH.misc=d.misc||[];
+    SH.inv_start=d.inv_start||7; SH.comp_start=d.comp_start||8; SH.prod_start=d.prod_start||8; SH.misc_start=d.misc_start||6;
     syncCatSeq();
     renderInv();renderComps();renderProds();updateStats();
     populateVendorFilters();populateCompVendors();
@@ -2079,6 +2180,100 @@ function removeOpt(si,oi){
 }
 
 // ── Sheets ─────────────────────────────────────────────────────────────────
+// ── Miscellaneous Items ───────────────────────────────────────────────────
+let _miscSeq=parseInt(localStorage.getItem('kc_misc_seq')||'1');
+
+function updateMiscStats(){
+  document.getElementById('misc-total').textContent=SH.misc.length;
+  document.getElementById('misc-instock').textContent=SH.misc.filter(r=>r[10]==='In stock').length;
+  document.getElementById('misc-inuse').textContent=SH.misc.filter(r=>r[10]==='In use').length;
+}
+
+function renderMisc(){
+  const srch=(document.getElementById('misc-search')?.value||'').toLowerCase();
+  const cat=document.getElementById('misc-cat')?.value||'';
+  const sta=document.getElementById('misc-status')?.value||'';
+  let data=SH.misc.map((r,i)=>({r,i,shRow:SH.misc_start+i}))
+    .filter(({r})=>{
+      const s=`${r[0]} ${r[1]} ${r[2]} ${r[4]}`.toLowerCase();
+      return(!srch||s.includes(srch))&&(!cat||r[2]===cat)&&(!sta||r[10]===sta);
+    });
+  data=applySortAndFilter(data.map(x=>x.r),'misc')
+    .map((r,idx)=>({r,i:SH.misc.indexOf(r),shRow:SH.misc_start+SH.misc.indexOf(r)}));
+
+  const MSCLS={'In stock':'bg-gn','In use':'bg-am','Depleted':'bg-gr','Damaged':'bg-rd'};
+  document.getElementById('misc-tbody').innerHTML=data.length
+    ? data.map(({r,i,shRow})=>`<tr>
+        <td style="font-family:var(--mono);font-size:11px;color:var(--pu)">${r[0]||''}</td>
+        <td style="font-weight:500">${ec('Miscellaneous Items',shRow,2,r[1])}</td>
+        <td><span class="badge bg-gr" style="font-size:9px">${r[2]||''}</span></td>
+        <td style="color:var(--mu2)">${ec('Miscellaneous Items',shRow,4,r[3])}</td>
+        <td style="color:var(--mu)">${ec('Miscellaneous Items',shRow,5,r[4])}</td>
+        <td style="font-family:var(--mono);font-size:11px">${r[5]||''}</td>
+        <td style="font-family:var(--mono);font-size:11px">${fmtDate(r[6])}</td>
+        <td style="text-align:center">${ec('Miscellaneous Items',shRow,8,r[7],'center')}</td>
+        <td style="text-align:right;font-family:var(--mono)">${fmtNum(r[8])}</td>
+        <td style="font-family:var(--mono);font-size:10px">${r[9]||''}</td>
+        <td>${statusSel('Miscellaneous Items',shRow,11,i,r[10]||'In stock')}</td>
+        <td style="font-family:var(--mono);font-size:11px;color:var(--ac)">${ec('Miscellaneous Items',shRow,12,r[11]||'')}</td>
+        <td>${ec('Miscellaneous Items',shRow,14,r[13]||'')}</td>
+        <td><button class="btn btn-rd btn-sm" style="padding:1px 6px" onclick="delMiscRow(${i},${shRow})">✕</button></td>
+      </tr>`).join('')
+    : `<tr><td colspan="14" style="text-align:center;padding:32px;color:var(--mu)">No items yet — click + Add item</td></tr>`;
+
+  document.getElementById('misc-count').textContent=`Showing ${data.length} of ${SH.misc.length} items`;
+  updateMiscStats();
+}
+
+function openAddMisc(){
+  document.getElementById('misc-date').value=new Date().toISOString().split('T')[0];
+  ['misc-name','misc-subtype','misc-vendor','misc-inv','misc-device','misc-loc','misc-notes'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('misc-qty').value='1';
+  document.getElementById('misc-price').value='0';
+  openMod('mod-misc');
+}
+
+async function saveMiscItem(){
+  const name=document.getElementById('misc-name').value.trim();
+  if(!name){toast('Item name is required','error');return;}
+  const id='MSC-'+String(_miscSeq).padStart(3,'0');
+  const entry=[
+    id,
+    name,
+    document.getElementById('misc-catsel').value,
+    document.getElementById('misc-subtype').value.trim(),
+    document.getElementById('misc-vendor').value.trim(),
+    document.getElementById('misc-inv').value.trim(),
+    document.getElementById('misc-date').value,
+    parseInt(document.getElementById('misc-qty').value)||1,
+    parseFloat(document.getElementById('misc-price').value)||0,
+    document.getElementById('misc-curr').value,
+    document.getElementById('misc-statussel').value,
+    document.getElementById('misc-device').value.trim(),
+    document.getElementById('misc-loc').value.trim(),
+    document.getElementById('misc-notes').value.trim()
+  ];
+  try{
+    await shCall({action:'add_misc',entry});
+    _miscSeq++;
+    localStorage.setItem('kc_misc_seq',String(_miscSeq));
+    SH.misc.push(entry);
+    closeMod('mod-misc');
+    renderMisc();
+    toast('Item added to Miscellaneous Items sheet','success');
+  }catch(e){toast('Failed: '+e.message,'error');}
+}
+
+async function delMiscRow(localIdx,shRow){
+  if(!confirm('Delete this item from Sheets?'))return;
+  try{
+    await shCall({action:'delete_row',sheet:'Miscellaneous Items',row:shRow});
+    SH.misc.splice(localIdx,1);
+    renderMisc();
+    toast('Item deleted','success');
+  }catch(e){toast('Delete failed','error');}
+}
+
 // ── Bulk Correct ──────────────────────────────────────────────────────────
 let _fixSel=new Set();
 
