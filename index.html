@@ -701,6 +701,16 @@ select.mi{cursor:pointer;appearance:auto}
       <button class="btn btn-sm" onclick="resetSKUDefaults()">Reset to defaults</button>
     </div>
 
+    <!-- SKU Quick Reference -->
+    <div style="background:var(--sf);border:1px solid var(--bd);border-radius:10px;padding:14px 16px;margin-bottom:14px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div style="font-size:10px;font-family:var(--mono);letter-spacing:1px;color:var(--mu)">QUICK REFERENCE — ALL CURRENT CODES</div>
+        <button class="btn btn-sm" style="font-size:10px" onclick="document.getElementById('sku-ref-full').style.display=document.getElementById('sku-ref-full').style.display==='none'?'block':'none'">Toggle full reference</button>
+      </div>
+      <div id="sku-ref-compact" style="font-family:var(--mono);font-size:12px;line-height:2;flex-wrap:wrap;display:flex;gap:8px" id="sku-ref-compact"></div>
+      <div id="sku-ref-full" style="display:none;margin-top:12px" id="sku-ref-full"></div>
+    </div>
+
     <!-- Live preview -->
     <div style="background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:10px 14px;margin-bottom:14px">
       <div style="font-size:9px;font-family:var(--mono);letter-spacing:1px;color:var(--mu);margin-bottom:6px">LIVE PREVIEW — example SKU using first option from each slot</div>
@@ -2032,6 +2042,41 @@ function renderSKUPanel(){
     wrap.innerHTML=buildSKUEditorHTML();
   }
   updateSKULivePreview();
+  renderSKUReference();
+}
+
+function renderSKUReference(){
+  // Compact badges
+  const compact=document.getElementById('sku-ref-compact');
+  if(compact){
+    compact.innerHTML=SKU_SLOTS.map(slot=>`
+      <span style="background:var(--sf2);border:1px solid var(--bd);border-radius:6px;padding:4px 10px;font-size:11px">
+        <span style="color:var(--mu);font-size:9px">[${slot.name.toUpperCase()}] </span>
+        ${slot.options.map(o=>`<span style="color:${o.notPresent?'var(--mu)':'var(--ac)'}"><strong>${o.code}</strong>=<span style="font-family:var(--sans);font-size:10px;color:var(--mu2)">${o.label}</span></span>`).join(' <span style="color:var(--mu)">·</span> ')}
+      </span>`).join('');
+  }
+  // Full reference table
+  const full=document.getElementById('sku-ref-full');
+  if(full){
+    const exampleSKU=SKU_SLOTS.map(s=>s.options[0]?.code||'').join('');
+    full.innerHTML=`
+      <div style="font-size:11px;color:var(--mu2);margin-bottom:10px">
+        Example: <span style="font-family:var(--mono);color:var(--ac);font-weight:500">${exampleSKU}</span> =
+        ${SKU_SLOTS.map(s=>`<span style="color:var(--mu)">${s.name}:</span> <span style="font-family:var(--mono);color:var(--ac)">${s.options[0]?.code}</span> (${s.options[0]?.label})`).join(' + ')}
+      </div>
+      ${SKU_SLOTS.map(slot=>`
+        <div style="margin-bottom:10px">
+          <div style="font-size:9px;font-family:var(--mono);letter-spacing:1px;color:var(--mu);margin-bottom:5px;font-weight:500">SLOT: ${slot.name.toUpperCase()} [${slot.catCode}]</div>
+          <div style="display:flex;flex-direction:column;gap:3px">
+            ${slot.options.map(o=>`
+              <div style="display:flex;align-items:center;gap:10px;background:var(--sf2);border-radius:5px;padding:5px 10px">
+                <span style="font-family:var(--mono);font-size:13px;font-weight:700;color:${o.notPresent?'var(--mu)':'var(--ac)'};min-width:50px">${o.code}</span>
+                <span style="font-size:12px;color:var(--tx)">${o.label}</span>
+                ${o.notPresent?'<span style="font-size:10px;color:var(--mu);font-family:var(--mono)">(not present)</span>':''}
+              </div>`).join('')}
+          </div>
+        </div>`).join('')}`;
+  }
 }
 
 function buildSKUEditorHTML(){
