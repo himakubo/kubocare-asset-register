@@ -833,7 +833,7 @@ function getAllData(ss) {
     'Invoice Log':          {key:'inv',  idCol:1},
     'Component Register':   {key:'comp', idCol:0},
     'Product Register':     {key:'prod', idCol:0},
-    'Miscellaneous Items':  {key:'misc', idCol:1}
+    'Miscellaneous Items':  {key:'misc', idCol:0}
   };
   const out = {inv:[],comp:[],prod:[],inv_start:0,comp_start:0,prod_start:0};
   Object.entries(sheets).forEach(([name,cfg]) => {
@@ -1831,7 +1831,7 @@ async function doApprove(forceBypassDup=false){
       const price=parseFloat(document.getElementById(`ip${ii}`)?.value)||0;
       const curr=document.getElementById(`icc${ii}`)?.value||'INR';
 
-      if ((cat || '').trim().toUpperCase() === 'MSC') {
+      if (cat === 'MSC') {
         // MSC → goes to Miscellaneous Items sheet, no asset ID, no component rows
         const miscEntry=[
           '',           // Item ID — left blank, auto-numbered in sheet
